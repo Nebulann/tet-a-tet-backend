@@ -256,37 +256,3 @@ class ImageService(private val mongoService: MongoService) {
       )
     }.toList()
   }
-
-  /**
-   * Изменить размер изображения
-   */
-  private fun resizeImage(
-    originalImage: BufferedImage,
-    targetWidth: Int,
-    targetHeight: Int,
-    mimeType: String
-  ): ByteArray {
-    val resizedImage = BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB)
-    val graphics = resizedImage.createGraphics()
-
-    graphics.drawImage(
-      originalImage.getScaledInstance(targetWidth, targetHeight, Image.SCALE_SMOOTH),
-      0,
-      0,
-      null
-    )
-    graphics.dispose()
-
-    val outputStream = ByteArrayOutputStream()
-    val format = when (mimeType) {
-      "image/png" -> "png"
-      "image/webp" -> "webp"
-      "image/gif" -> "gif"
-      else -> "jpg"
-    }
-
-    ImageIO.write(resizedImage, format, outputStream)
-
-    return outputStream.toByteArray()
-  }
-}
