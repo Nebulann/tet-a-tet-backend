@@ -6,6 +6,8 @@ import com.mongodb.client.gridfs.model.GridFSUploadOptions
 import com.rrain.kupidon.models.db.ImageM
 import com.rrain.kupidon.models.db.ImageType
 import com.rrain.kupidon.services.mongo.MongoService
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import org.bson.Document
 import org.bson.types.ObjectId
@@ -21,19 +23,19 @@ import javax.imageio.ImageIO
  * Сервис для работы с изображениями через MongoDB GridFS
  */
 class ImageService(private val mongoService: MongoService) {
-  
+
   private val gridFsBucket: GridFSBucket by lazy {
     GridFSBuckets.create(mongoService.database, "images")
   }
-  
+
   private val imagesCollection by lazy {
     mongoService.database.getCollection("images_metadata")
   }
-  
+
   companion object {
     // Максимальный размер файла: 10 МБ
     const val MAX_FILE_SIZE = 10 * 1024 * 1024
-    
+
     // Разрешенные MIME типы
     val ALLOWED_MIME_TYPES = setOf(
       "image/jpeg",
@@ -42,123 +44,100 @@ class ImageService(private val mongoService: MongoService) {
       "image/webp",
       "image/gif"
     )
-    
+
     // Максимальные размеры изображения
     const val MAX_WIDTH = 2048
     const val MAX_HEIGHT = 2048
   }
-  
+
   /**
    * Загрузить изображение
    */
   suspend fun uploadImage(
     userId: UUID,
-    fileName: String,
-    mimeType: String,
     inputStream: InputStream,
-    imageType: ImageType,
-    relatedEntityId: UUID? = null
-  ): ImageM {
-    // Валидация MIME типа
-    if (mimeType !in ALLOWED_MIME_TYPES) {
-      throw IllegalArgumentException("Недопустимый тип файла. Разрешены: ${ALLOWED_MIME_TYPES.joinToString()}")
+    originalFileName: String,
+    mimeType: String,
+    relatedEntityId: UUID? = null,
+    imageType: ImageType = ImageType.OTHER
+  ): ImageM = withContext(Dispatchers.IO) {
+    // Валидация
+    require(mimeType in ALLOWED_MIME_TYPES) { "Неподдерживаемый тип файла: $mimeType" }
+
+    // Читаем изображение для получения размеров
+    val bufferedImage = ImageIO.read(inputStream) ?: throw IllegalArgumentException("Невозможно прочитать изображение")
+    val (width, height) = bufferedImage.width to bufferedImage.height
+
+    // Проверяем размеры
+    if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+      throw IllegalArgumentException("Размер изображения превышает максимальный: ${MAX_WIDTH}x${MAX_HEIGHT}")
     }
-    
-    // Читаем изображение в память
-    val imageBytes = inputStream.readBytes()
-    
-    // Валидация размера файла
-    if (imageBytes.size > MAX_FILE_SIZE) {
-      throw IllegalArgumentException("Размер файла превышает максимально допустимый (${MAX_FILE_SIZE / 1024 / 1024} МБ)")
-    }
-    
-    // Читаем изображение для получения размеров и оптимизации
-    val bufferedImage = ImageIO.read(ByteArrayInputStream(imageBytes))
-      ?: throw IllegalArgumentException("Не удалось прочитать изображение")
-    
-    var width = bufferedImage.width
-    var height = bufferedImage.height
-    
-    // Оптимизация: изменение размера если изображение слишком большое
+
+    // Сбрасываем inputStream для повторного чтения
+    inputStream.reset()
+
+    // Оптимизируем изображение если нужно
     val optimizedBytes = if (width > MAX_WIDTH || height > MAX_HEIGHT) {
       val scale = minOf(MAX_WIDTH.toDouble() / width, MAX_HEIGHT.toDouble() / height)
       val newWidth = (width * scale).toInt()
       val newHeight = (height * scale).toInt()
-      
-      width = newWidth
-      height = newHeight
-      
+
       resizeImage(bufferedImage, newWidth, newHeight, mimeType)
     } else {
-      imageBytes
+      inputStream.readBytes()
     }
-    
+
     // Загружаем в GridFS
-    val metadata = Document()
-      .append("uploadedBy", userId.toString())
-      .append("imageType", imageType.name)
-      .append("relatedEntityId", relatedEntityId?.toString())
-    
-    val options = GridFSUploadOptions()
-      .metadata(metadata)
-    
-    val gridFsId = gridFsBucket.uploadFromStream(
-      fileName,
-      ByteArrayInputStream(optimizedBytes),
-      options
-    )
-    
+    val objectId = gridFsBucket.uploadFromStream(originalFileName, ByteArrayInputStream(optimizedBytes))
+
     // Создаем метаданные
-    val imageId = UUID.randomUUID()
-    val now = Clock.System.now()
-    
     val imageM = ImageM(
-      id = imageId,
+      id = UUID.randomUUID(),
       uploadedBy = userId,
-      originalFileName = fileName,
+      originalFileName = originalFileName,
       mimeType = mimeType,
       fileSize = optimizedBytes.size.toLong(),
       width = width,
       height = height,
-      gridFsId = gridFsId.toString(),
+      gridFsId = objectId.toString(),
       imageType = imageType,
       relatedEntityId = relatedEntityId,
-      uploadedAt = now,
+      uploadedAt = Clock.System.now(),
       isActive = true
     )
-    
+
     // Сохраняем метаданные в коллекцию
     val doc = Document()
-      .append("_id", imageId.toString())
-      .append("uploadedBy", userId.toString())
-      .append("originalFileName", fileName)
-      .append("mimeType", mimeType)
+      .append("_id", imageM.id.toString())
+      .append("uploadedBy", imageM.uploadedBy.toString())
+      .append("originalFileName", imageM.originalFileName)
+      .append("mimeType", imageM.mimeType)
       .append("fileSize", imageM.fileSize)
-      .append("width", width)
-      .append("height", height)
-      .append("gridFsId", gridFsId.toString())
-      .append("imageType", imageType.name)
-      .append("relatedEntityId", relatedEntityId?.toString())
-      .append("uploadedAt", now.toString())
-      .append("isActive", true)
-    
+      .append("width", imageM.width)
+      .append("height", imageM.height)
+      .append("gridFsId", imageM.gridFsId)
+      .append("imageType", imageM.imageType.name)
+      .append("relatedEntityId", imageM.relatedEntityId?.toString())
+      .append("uploadedAt", imageM.uploadedAt.toString())
+      .append("isActive", imageM.isActive)
+
     imagesCollection.insertOne(doc)
-    
-    return imageM
+
+    imageM
   }
-  
+
   /**
-   * Получить изображение по ID
+   * Получить изображение с данными
    */
-  suspend fun getImage(imageId: UUID): Pair<ImageM, InputStream>? {
+  suspend fun getImageWithData(imageId: UUID): Pair<ImageM, InputStream>? = withContext(Dispatchers.IO) {
     // Получаем метаданные
     val doc = imagesCollection.find(Document("_id", imageId.toString())).firstOrNull()
-      ?: return null
-    
+      ?: return@withContext null
+
     if (doc.getBoolean("isActive") != true) {
-      return null
+      return@withContext null
     }
-    
+
     val imageM = ImageM(
       id = UUID.fromString(doc.getString("_id")),
       uploadedBy = UUID.fromString(doc.getString("uploadedBy")),
@@ -168,32 +147,32 @@ class ImageService(private val mongoService: MongoService) {
       width = doc.getInteger("width"),
       height = doc.getInteger("height"),
       gridFsId = doc.getString("gridFsId"),
-      imageType = ImageType.valueOf(doc.getString("imageType")),
+      imageType = ImageType.valueOf(doc.getString("imageType") ?: "OTHER"),
       relatedEntityId = doc.getString("relatedEntityId")?.let { UUID.fromString(it) },
-      uploadedAt = kotlinx.datetime.Instant.parse(doc.getString("uploadedAt")),
+      uploadedAt = kotlinx.datetime.Instant.parse(doc.getString("uploadedAt") ?: ""),
       isActive = doc.getBoolean("isActive")
     )
-    
+
     // Получаем файл из GridFS
     val gridFsFile = gridFsBucket.find(Document("_id", ObjectId(imageM.gridFsId))).firstOrNull()
-      ?: return null
-    
+      ?: return@withContext null
+
     val inputStream = gridFsBucket.openDownloadStream(gridFsFile.objectId)
-    
-    return Pair(imageM, inputStream)
+
+    return@withContext Pair(imageM, inputStream)
   }
-  
+
   /**
    * Получить метаданные изображения
    */
   suspend fun getImageMetadata(imageId: UUID): ImageM? {
     val doc = imagesCollection.find(Document("_id", imageId.toString())).firstOrNull()
       ?: return null
-    
+
     if (doc.getBoolean("isActive") != true) {
       return null
     }
-    
+
     return ImageM(
       id = UUID.fromString(doc.getString("_id")),
       uploadedBy = UUID.fromString(doc.getString("uploadedBy")),
@@ -203,63 +182,63 @@ class ImageService(private val mongoService: MongoService) {
       width = doc.getInteger("width"),
       height = doc.getInteger("height"),
       gridFsId = doc.getString("gridFsId"),
-      imageType = ImageType.valueOf(doc.getString("imageType")),
+      imageType = ImageType.valueOf(doc.getString("imageType") ?: "OTHER"),
       relatedEntityId = doc.getString("relatedEntityId")?.let { UUID.fromString(it) },
-      uploadedAt = kotlinx.datetime.Instant.parse(doc.getString("uploadedAt")),
+      uploadedAt = kotlinx.datetime.Instant.parse(doc.getString("uploadedAt") ?: ""),
       isActive = doc.getBoolean("isActive")
     )
   }
-  
+
   /**
    * Удалить изображение (soft delete)
    */
   suspend fun deleteImage(imageId: UUID, userId: UUID): Boolean {
     val doc = imagesCollection.find(Document("_id", imageId.toString())).firstOrNull()
       ?: return false
-    
+
     // Проверяем, что пользователь является владельцем изображения
     if (doc.getString("uploadedBy") != userId.toString()) {
       throw IllegalArgumentException("У вас нет прав на удаление этого изображения")
     }
-    
+
     // Soft delete - помечаем как неактивное
     imagesCollection.updateOne(
       Document("_id", imageId.toString()),
       Document("\$set", Document("isActive", false))
     )
-    
+
     return true
   }
-  
+
   /**
    * Удалить изображение физически (для администраторов)
    */
   suspend fun deleteImagePermanently(imageId: UUID): Boolean {
     val doc = imagesCollection.find(Document("_id", imageId.toString())).firstOrNull()
       ?: return false
-    
+
     val gridFsId = doc.getString("gridFsId")
-    
+
     // Удаляем из GridFS
     gridFsBucket.delete(ObjectId(gridFsId))
-    
+
     // Удаляем метаданные
     imagesCollection.deleteOne(Document("_id", imageId.toString()))
-    
+
     return true
   }
-  
+
   /**
    * Получить все изображения пользователя
    */
   suspend fun getUserImages(userId: UUID, imageType: ImageType? = null): List<ImageM> {
     val filter = Document("uploadedBy", userId.toString())
       .append("isActive", true)
-    
+
     if (imageType != null) {
       filter.append("imageType", imageType.name)
     }
-    
+
     return imagesCollection.find(filter).map { doc ->
       ImageM(
         id = UUID.fromString(doc.getString("_id")),
@@ -277,7 +256,7 @@ class ImageService(private val mongoService: MongoService) {
       )
     }.toList()
   }
-  
+
   /**
    * Изменить размер изображения
    */
@@ -289,7 +268,7 @@ class ImageService(private val mongoService: MongoService) {
   ): ByteArray {
     val resizedImage = BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB)
     val graphics = resizedImage.createGraphics()
-    
+
     graphics.drawImage(
       originalImage.getScaledInstance(targetWidth, targetHeight, Image.SCALE_SMOOTH),
       0,
@@ -297,7 +276,7 @@ class ImageService(private val mongoService: MongoService) {
       null
     )
     graphics.dispose()
-    
+
     val outputStream = ByteArrayOutputStream()
     val format = when (mimeType) {
       "image/png" -> "png"
@@ -305,9 +284,9 @@ class ImageService(private val mongoService: MongoService) {
       "image/gif" -> "gif"
       else -> "jpg"
     }
-    
+
     ImageIO.write(resizedImage, format, outputStream)
-    
+
     return outputStream.toByteArray()
   }
 }
