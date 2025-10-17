@@ -270,9 +270,9 @@ class ImageService(private val mongoService: MongoService) {
         width = doc.getInteger("width"),
         height = doc.getInteger("height"),
         gridFsId = doc.getString("gridFsId"),
-        imageType = ImageType.valueOf(doc.getString("imageType")),
+        imageType = ImageType.valueOf(doc.getString("imageType") ?: "OTHER"),
         relatedEntityId = doc.getString("relatedEntityId")?.let { UUID.fromString(it) },
-        uploadedAt = kotlinx.datetime.Instant.parse(doc.getString("uploadedAt")),
+        uploadedAt = kotlinx.datetime.Instant.parse(doc.getString("uploadedAt") ?: ""),
         isActive = doc.getBoolean("isActive")
       )
     }.toList()
