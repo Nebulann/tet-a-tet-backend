@@ -1,4 +1,7 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.gradle.api.tasks.bundling.Jar
+import org.gradle.api.file.DuplicatesStrategy
+import org.gradle.api.file.CopySpec
 
 plugins {
   val kotlinV = "2.2.10"
@@ -24,6 +27,23 @@ application {
 val compileKotlin: KotlinCompile by tasks
 compileKotlin.compilerOptions {
   freeCompilerArgs.add("-Xcontext-parameters") // enable experimental context parameters
+}
+
+
+// Create a fat JAR with all dependencies
+tasks.register<Jar>("buildFatJar") {
+    dependsOn(tasks.named("build"))
+    
+    archiveClassifier.set("all")
+    
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    
+    from(configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) })
+    with(tasks.jar.get() as CopySpec)
+    
+    manifest {
+        attributes["Main-Class"] = "io.ktor.server.jetty.jakarta.EngineMain"
+    }
 }
 
 
@@ -106,4 +126,8 @@ dependencies {
   // WebP support for ImageIO
   val webpImageIOV = "0.1.6"
   implementation("org.sejda.imageio:webp-imageio:$webpImageIOV")
+  
+  // Firebase Admin SDK for push notifications
+  val firebaseAdminV = "9.4.1"
+  implementation("com.google.firebase:firebase-admin:$firebaseAdminV")
 }

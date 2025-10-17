@@ -11,10 +11,10 @@ import java.util.UUID
  * Сервис для отправки push-уведомлений через Firebase Cloud Messaging
  */
 class PushNotificationService {
-    
+
     companion object {
         private var firebaseApp: FirebaseApp? = null
-        
+
         /**
          * Инициализировать Firebase Admin SDK с service account файлом
          */
@@ -23,13 +23,13 @@ class PushNotificationService {
                 try {
                     val serviceAccount = FileInputStream(serviceAccountPath)
                     val credentials = GoogleCredentials.fromStream(serviceAccount)
-                    
+
                     val options = FirebaseOptions.builder()
                         .setCredentials(credentials)
                         .build()
-                    
+
                     firebaseApp = FirebaseApp.initializeApp(options)
-                    
+
                     println("Firebase Admin SDK инициализирован успешно с service account: $serviceAccountPath")
                 } catch (e: Exception) {
                     println("Ошибка инициализации Firebase Admin SDK: ${e.message}")
@@ -37,33 +37,8 @@ class PushNotificationService {
                 }
             }
         }
-        
-        /**
-         * Получить экземпляр Firebase Messaging
-         */
-        private fun getMessaging(): FirebaseMessaging? {
-            return try {
-                firebaseApp?.let { FirebaseMessaging.getInstance(it) }
-            } catch (e: Exception) {
-                println("Ошибка получения Firebase Messaging: ${e.message}")
-                null
-            }
-        }
     }
-        
-        /**
-         * Получить экземпляр Firebase Messaging
-         */
-        private fun getMessaging(): FirebaseMessaging? {
-            return try {
-                firebaseApp?.let { FirebaseMessaging.getInstance(it) }
-            } catch (e: Exception) {
-                println("Ошибка получения Firebase Messaging: ${e.message}")
-                null
-            }
-        }
-    }
-    
+
     /**
      * Отправить уведомление одному пользователю
      */
@@ -75,19 +50,19 @@ class PushNotificationService {
         imageUrl: String? = null
     ): Boolean {
         return try {
-            val messaging = getMessaging() ?: return false
-            
-            val notification = Notification.builder()
-                .setTitle(title)
-                .setBody(body)
-                .apply {
-                    imageUrl?.let { setImage(it) }
-                }
-                .build()
-            
+            val messaging = FirebaseMessaging.getInstance(getFirebaseApp())
+
             val message = Message.builder()
                 .setToken(fcmToken)
-                .setNotification(notification)
+                .setNotification(
+                    com.google.firebase.messaging.Notification.builder()
+                        .setTitle(title)
+                        .setBody(body)
+                        .apply {
+                            imageUrl?.let { setImage(it) }
+                        }
+                        .build()
+                )
                 .putAllData(data)
                 .setAndroidConfig(
                     AndroidConfig.builder()
@@ -113,10 +88,10 @@ class PushNotificationService {
                         .build()
                 )
                 .build()
-            
+
             val response = messaging.send(message)
             println("Уведомление отправлено успешно: $response")
-            
+
             true
         } catch (e: Exception) {
             println("Ошибка отправки уведомления: ${e.message}")
@@ -124,7 +99,7 @@ class PushNotificationService {
             false
         }
     }
-    
+
     /**
      * Отправить уведомление нескольким пользователям
      */
@@ -136,21 +111,21 @@ class PushNotificationService {
         imageUrl: String? = null
     ): Int {
         if (fcmTokens.isEmpty()) return 0
-        
+
         return try {
-            val messaging = getMessaging() ?: return 0
-            
-            val notification = Notification.builder()
-                .setTitle(title)
-                .setBody(body)
-                .apply {
-                    imageUrl?.let { setImage(it) }
-                }
-                .build()
-            
+            val messaging = FirebaseMessaging.getInstance(getFirebaseApp())
+
             val message = MulticastMessage.builder()
                 .addAllTokens(fcmTokens)
-                .setNotification(notification)
+                .setNotification(
+                    com.google.firebase.messaging.Notification.builder()
+                        .setTitle(title)
+                        .setBody(body)
+                        .apply {
+                            imageUrl?.let { setImage(it) }
+                        }
+                        .build()
+                )
                 .putAllData(data)
                 .setAndroidConfig(
                     AndroidConfig.builder()
@@ -165,10 +140,10 @@ class PushNotificationService {
                         .build()
                 )
                 .build()
-            
+
             val response = messaging.sendEachForMulticast(message)
             println("Отправлено ${response.successCount} из ${fcmTokens.size} уведомлений")
-            
+
             response.successCount
         } catch (e: Exception) {
             println("Ошибка отправки множественных уведомлений: ${e.message}")
@@ -176,7 +151,7 @@ class PushNotificationService {
             0
         }
     }
-    
+
     /**
      * Отправить уведомление по топику
      */
@@ -188,25 +163,25 @@ class PushNotificationService {
         imageUrl: String? = null
     ): Boolean {
         return try {
-            val messaging = getMessaging() ?: return false
-            
-            val notification = Notification.builder()
-                .setTitle(title)
-                .setBody(body)
-                .apply {
-                    imageUrl?.let { setImage(it) }
-                }
-                .build()
-            
+            val messaging = FirebaseMessaging.getInstance(getFirebaseApp())
+
             val message = Message.builder()
                 .setTopic(topic)
-                .setNotification(notification)
+                .setNotification(
+                    com.google.firebase.messaging.Notification.builder()
+                        .setTitle(title)
+                        .setBody(body)
+                        .apply {
+                            imageUrl?.let { setImage(it) }
+                        }
+                        .build()
+                )
                 .putAllData(data)
                 .build()
-            
+
             val response = messaging.send(message)
             println("Уведомление в топик отправлено: $response")
-            
+
             true
         } catch (e: Exception) {
             println("Ошибка отправки уведомления в топик: ${e.message}")
@@ -214,13 +189,13 @@ class PushNotificationService {
             false
         }
     }
-    
+
     /**
      * Подписать пользователя на топик
      */
     suspend fun subscribeToTopic(fcmToken: String, topic: String): Boolean {
         return try {
-            val messaging = getMessaging() ?: return false
+            val messaging = FirebaseMessaging.getInstance(getFirebaseApp())
             messaging.subscribeToTopic(listOf(fcmToken), topic)
             println("Пользователь подписан на топик: $topic")
             true
@@ -229,13 +204,13 @@ class PushNotificationService {
             false
         }
     }
-    
+
     /**
      * Отписать пользователя от топика
      */
     suspend fun unsubscribeFromTopic(fcmToken: String, topic: String): Boolean {
         return try {
-            val messaging = getMessaging() ?: return false
+            val messaging = FirebaseMessaging.getInstance(getFirebaseApp())
             messaging.unsubscribeFromTopic(listOf(fcmToken), topic)
             println("Пользователь отписан от топика: $topic")
             true
@@ -243,6 +218,13 @@ class PushNotificationService {
             println("Ошибка отписки от топика: ${e.message}")
             false
         }
+    }
+
+    /**
+     * Получить FirebaseApp экземпляр
+     */
+    private fun getFirebaseApp(): FirebaseApp {
+        return firebaseApp ?: throw IllegalStateException("Firebase App не инициализирован. Вызовите PushNotificationService.initialize() сначала.")
     }
 }
 
@@ -270,7 +252,7 @@ object NotificationDataBuilder {
             "senderName" to senderName
         )
     }
-    
+
     fun forLike(userId: UUID, userName: String): Map<String, String> {
         return mapOf(
             "type" to NotificationType.LIKE.value,
@@ -278,7 +260,7 @@ object NotificationDataBuilder {
             "userName" to userName
         )
     }
-    
+
     fun forMatch(userId: UUID, userName: String): Map<String, String> {
         return mapOf(
             "type" to NotificationType.MATCH.value,
@@ -286,7 +268,7 @@ object NotificationDataBuilder {
             "userName" to userName
         )
     }
-    
+
     fun forEvent(eventId: UUID, eventTitle: String): Map<String, String> {
         return mapOf(
             "type" to NotificationType.EVENT.value,
@@ -294,7 +276,7 @@ object NotificationDataBuilder {
             "eventTitle" to eventTitle
         )
     }
-    
+
     fun forDateIdea(ideaId: UUID, ideaTitle: String): Map<String, String> {
         return mapOf(
             "type" to NotificationType.DATE_IDEA.value,
