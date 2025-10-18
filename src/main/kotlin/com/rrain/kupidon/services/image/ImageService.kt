@@ -2,16 +2,17 @@ package com.rrain.kupidon.services.image
 
 import com.mongodb.client.gridfs.GridFSBucket
 import com.mongodb.client.gridfs.GridFSBuckets
-import com.mongodb.client.gridfs.model.GridFSUploadOptions
+import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import com.rrain.kupidon.models.db.ImageM
 import com.rrain.kupidon.models.db.ImageType
-import com.rrain.kupidon.services.mongo.MongoService
+import com.rrain.kupidon.services.mongo.mongoAppDb
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import org.bson.Document
 import org.bson.types.ObjectId
-import java.awt.Image
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -22,14 +23,18 @@ import javax.imageio.ImageIO
 /**
  * Сервис для работы с изображениями через MongoDB GridFS
  */
-class ImageService(private val mongoService: MongoService) {
+class ImageService(private val database: MongoDatabase = mongoAppDb) {
 
   private val gridFsBucket: GridFSBucket by lazy {
-    GridFSBuckets.create(mongoService.database, "images")
+    GridFSBuckets.create(database.toSyncDatabase(), "images")
   }
 
   private val imagesCollection by lazy {
-    mongoService.database.getCollection("images_metadata")
+    database.getCollection<Document>("images_metadata")
+  }
+
+  private fun MongoDatabase.toSyncDatabase(): com.mongodb.client.MongoDatabase {
+    return com.mongodb.client.MongoClients.create().getDatabase(this.name)
   }
 
   companion object {
@@ -239,7 +244,7 @@ class ImageService(private val mongoService: MongoService) {
       filter.append("imageType", imageType.name)
     }
 
-    return imagesCollection.find(filter).map { doc ->
+    return imagesCollection.find(filter).toList().map { doc ->
       ImageM(
         id = UUID.fromString(doc.getString("_id")),
         uploadedBy = UUID.fromString(doc.getString("uploadedBy")),
@@ -254,5 +259,7 @@ class ImageService(private val mongoService: MongoService) {
         uploadedAt = kotlinx.datetime.Instant.parse(doc.getString("uploadedAt") ?: ""),
         isActive = doc.getBoolean("isActive")
       )
-    }.toList()
+    }
   }
+
+}

@@ -2,63 +2,45 @@
 
 name: kupidon-local-ktor
 
-
 services:
   ktor:
     build:
       dockerfile: Dockerfile
     ports:
-      - '${PROXY_PORT}:${PROXY_PORT}'
-    volumes:
-      - ./mongo-client/certs-local:/data/mongo-client-certs/:ro
+      - "8080:8080"
     environment:
-      - KTOR_PORT
-      - MONGO_HOST
-      - MONGO_PORT
-      - MONGO_RS
-      - MONGO_DATABASE
-      - MONGO_BACKEND_CLIENT_CERT
-      - MONGO_CA_CERT
-      - PWD_HASHING_ALGORITHM
-      - PWD_HASHING_SECRET
-      - PWD_HASHING_ITERATIONS
-      - PWD_HASHING_HASH_LEN
-      - AUTH_REFRESH_TOKEN_SECRET
-      - AUTH_ACCESS_TOKEN_SECRET
-      - MAIL_EMAIL
-      - MAIL_PWD
+      - KTOR_PORT=8080
+      - MONGO_HOST=kupidon-mongo
+      - MONGO_PORT=27017
+      - MONGO_RS=
+      - MONGO_DATABASE=kupidon
+      - MONGO_BACKEND_CLIENT_CERT=
+      - MONGO_CA_CERT=
+      - PWD_HASHING_ALGORITHM=PBKDF2
+      - PWD_HASHING_SECRET=test-secret-key
+      - PWD_HASHING_ITERATIONS=10000
+      - PWD_HASHING_HASH_LEN=256
+      - AUTH_REFRESH_TOKEN_SECRET=test-refresh-secret-key
+      - AUTH_ACCESS_TOKEN_SECRET=test-access-secret-key
+      - MAIL_EMAIL=test@example.com
+      - MAIL_PWD=test-password
+      - APP_MODE=development
+    depends_on:
+      - kupidon-mongo
     restart: unless-stopped
 
-
-  nginx-proxy:
-    image: nginx:1.25.5-alpine
-    network_mode: 'service:ktor'
+  kupidon-mongo:
+    image: mongo:7.0.14
+    ports:
+      - "27017:27017"
     volumes:
-      - ./nginx-proxy/nginx.conf:/etc/nginx/templates/nginx.conf.template:ro
-      - ${PROXY_CERT_CRT}:/etc/ssl/cert/cert.crt:ro
-      - ${PROXY_CERT_KEY}:/etc/ssl/cert/cert.key:ro
+      - kupidon-mongo-data:/data/db
     environment:
-      # where to find 'templates/nginx.conf.template'
-      - NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx
-      - PROXY_HOST
-      - PROXY_PORT
-      - KTOR_PORT
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=strong_password
+      - MONGO_INITDB_DATABASE=kupidon
     restart: unless-stopped
 
-
-# nginx auto env substitution:
-# https://stackoverflow.com/a/75183393/14168271
-#
-# nginx Docker image can extract environment variables before it starts, but it's a bit tricky.
-# One solution is to:
-#
-# 1) Add env variables to your nginx.conf file.
-# 2) Copy it to /etc/nginx/templates/nginx.conf.template in the container (as opposed to your normal /etc/nginx) in the build step or as a volume.
-# 3)Set the NGINX_ENVSUBST_OUTPUT_DIR: /etc/nginx environment variable in docker-compose.yml.
-#
-# This will cause the nginx.conf.template file to be copied to /etc/nginx as nginx.conf
-# and the environment variables will be replaced with their values.
-#
-# There is one caveat to keep in mind: using command property in docker-compose.yml seems to be disabling
-# the extraction functionality.
+volumes:
+  kupidon-mongo-data:
 
