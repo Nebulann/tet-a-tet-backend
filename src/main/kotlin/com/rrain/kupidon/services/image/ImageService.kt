@@ -2,6 +2,7 @@ package com.rrain.kupidon.services.image
 
 import com.mongodb.client.gridfs.GridFSBucket
 import com.mongodb.client.gridfs.GridFSBuckets
+import com.mongodb.client.MongoClients
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import com.rrain.kupidon.models.db.ImageM
 import com.rrain.kupidon.models.db.ImageType
@@ -26,15 +27,12 @@ import javax.imageio.ImageIO
 class ImageService(private val database: MongoDatabase = mongoAppDb) {
 
   private val gridFsBucket: GridFSBucket by lazy {
-    GridFSBuckets.create(database.toSyncDatabase(), "images")
+    val syncDb = MongoClients.create().getDatabase(database.name)
+    GridFSBuckets.create(syncDb, "images")
   }
 
   private val imagesCollection by lazy {
     database.getCollection<Document>("images_metadata")
-  }
-
-  private fun MongoDatabase.toSyncDatabase(): com.mongodb.client.MongoDatabase {
-    return com.mongodb.client.MongoClients.create().getDatabase(this.name)
   }
 
   companion object {
@@ -87,7 +85,7 @@ class ImageService(private val database: MongoDatabase = mongoAppDb) {
       val newWidth = (width * scale).toInt()
       val newHeight = (height * scale).toInt()
 
-      resizeImage(bufferedImage, newWidth, newHeight, mimeType)
+      resizeAndConvert(bufferedImage, newWidth, newHeight, mimeType)
     } else {
       inputStream.readBytes()
     }
@@ -129,6 +127,31 @@ class ImageService(private val database: MongoDatabase = mongoAppDb) {
     imagesCollection.insertOne(doc)
 
     imageM
+  }
+
+  /**
+   * Изменить размер и конвертировать изображение
+   */
+  private fun resizeAndConvert(
+    image: BufferedImage,
+    newWidth: Int,
+    newHeight: Int,
+    mimeType: String
+  ): ByteArray {
+    val resized = BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_RGB)
+    val graphics = resized.createGraphics()
+    graphics.drawImage(image, 0, 0, newWidth, newHeight, null)
+    graphics.dispose()
+
+    val outputStream = ByteArrayOutputStream()
+    val format = when (mimeType) {
+      "image/jpeg", "image/jpg" -> "jpg"
+      "image/png" -> "png"
+      "image/webp" -> "webp"
+      else -> "jpg"
+    }
+    ImageIO.write(resized, format, outputStream)
+    return outputStream.toByteArray()
   }
 
   /**

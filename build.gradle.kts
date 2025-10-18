@@ -68,6 +68,8 @@ dependencies {
   implementation(platform("org.mongodb:mongodb-driver-bom:$mongoKotlinCoroutineDriverV"))
   implementation("org.mongodb:mongodb-driver-kotlin-coroutine")
   implementation("org.mongodb:bson-kotlinx")
+  // Sync MongoDB driver for GridFS
+  implementation("org.mongodb:mongodb-driver-sync")
   
   val slf4jV = "2.0.17"
   val logbackV = "1.5.18"
@@ -82,6 +84,8 @@ dependencies {
   
   
   // Other ktor plugins
+  // Ktor server - CORS
+  implementation("io.ktor:ktor-server-cors")
   // Ktor server - Auth
   implementation("io.ktor:ktor-server-auth")
   // Ktor server - JWT auth
