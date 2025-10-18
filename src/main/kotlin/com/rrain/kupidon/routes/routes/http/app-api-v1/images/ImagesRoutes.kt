@@ -26,7 +26,7 @@ import java.util.UUID
  */
 fun Application.addImagesRoutes() {
   
-  val imageService = ImageService(com.rrain.kupidon.services.mongo.mongoService)
+  val imageService = ImageService()
   
   routing {
     
@@ -79,7 +79,7 @@ fun Application.addImagesRoutes() {
           
           val image = imageService.uploadImage(
             userId = userId,
-            fileName = fileName!!,
+            originalFileName = fileName!!,
             mimeType = mimeType!!,
             inputStream = inputStream!!,
             imageType = imageType,
@@ -113,7 +113,7 @@ fun Application.addImagesRoutes() {
           try { UUID.fromString(it) } catch (e: Exception) { null }
         } ?: return@get call.respondInvalidBody("Неверный ID изображения")
         
-        val result = imageService.getImage(imageId)
+        val result = imageService.getImageWithData(imageId)
         
         if (result == null) {
           return@get call.respondNotFound("Изображение не найдено")

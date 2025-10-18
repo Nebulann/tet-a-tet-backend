@@ -249,7 +249,8 @@ fun Application.addEventsRoutes() {
           return@post call.respond(mapOf("message" to "Already attending"))
         }
         
-        if (event.maxParticipants != null && event.participants.size >= event.maxParticipants) {
+        val maxParts = event.maxParticipants
+        if (maxParts != null && event.participants.size >= maxParts) {
           return@post call.respondInvalidBody("Event is full")
         }
         
