@@ -99,3 +99,12 @@ suspend inline fun ApplicationCall.respondNoUserById() = respond(
   HttpStatusCode.BadRequest,
   CodeMsg("NO_USER", "No user with such id")
 )
+
+// Общая ошибка с кастомным статусом и сообщением
+suspend inline fun ApplicationCall.respondError(
+  status: HttpStatusCode,
+  message: String
+) = respond(
+  status,
+  CodeMsg("ERROR", message)
+)
