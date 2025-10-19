@@ -49,6 +49,14 @@ object Env {
   val dbConnectionMongoCaCert: String get() =
     app.appConfig["db.connection.mongo.caCert"]
   
+  context(app: Application)
+  val dbConnectionMongoUsername: String? get() =
+    app.appConfig.propertyOrNull("db.connection.mongo.username")?.getString()
+  
+  context(app: Application)
+  val dbConnectionMongoPassword: String? get() =
+    app.appConfig.propertyOrNull("db.connection.mongo.password")?.getString()
+  
   
   context(app: Application)
   val dbUserPwdHashingAlgorithm: String get() =

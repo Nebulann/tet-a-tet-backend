@@ -35,23 +35,47 @@ fun Application.configureMongoDbService() {
   val port = Env.dbConnectionMongoPort
   val rs = Env.dbConnectionMongoRs
   val database = Env.dbConnectionMongoDatabase
+  val username = Env.dbConnectionMongoUsername
+  val password = Env.dbConnectionMongoPassword
   val backendClientCert = Env.dbConnectionMongoBackendClientCert
   val caCert = Env.dbConnectionMongoCaCert
   
   
-  val connectionString = URLBuilder(
-    $$"mongodb://$$host:$$port/" +
-      $$"?replicaSet=$$rs&tls=true&authSource=$external&authMechanism=MONGODB-X509"
-  ).buildString()
+  // Проверяем, нужно ли использовать SSL с сертификатами
+  val useSslCerts = backendClientCert.isNotEmpty() && caCert.isNotEmpty()
+  val useCredentials = username != null && password != null
+  
+  val connectionString = when {
+    useSslCerts -> {
+      URLBuilder(
+        $$"mongodb://$$host:$$port/" +
+          $$"?replicaSet=$$rs&tls=true&authSource=$external&authMechanism=MONGODB-X509"
+      ).buildString()
+    }
+    useCredentials -> {
+      // Для MongoDB Atlas с username/password
+      val rsParam = if (rs.isNotEmpty()) "replicaSet=$rs&" else ""
+      $$"mongodb+srv://$$username:$$password@$$host/$$database?$${rsParam}retryWrites=true&w=majority"
+    }
+    else -> {
+      // Без аутентификации (локальная разработка)
+      val rsParam = if (rs.isNotEmpty()) "?replicaSet=$rs" else ""
+      $$"mongodb://$$host:$$port/$$database$$rsParam"
+    }
+  }
   
   
   // https://www.mongodb.com/docs/drivers/kotlin/coroutine/current/fundamentals/connection/connection-options/
   val connectionSettings = MongoClientSettings.builder()
     .applicationName(appName)
     .applyConnectionString(ConnectionString(connectionString))
-    .applyToSslSettings { builder ->
-      builder.enabled(true)
-      builder.context(getMongoSslContext(backendClientCert, caCert))
+    .apply {
+      if (useSslCerts) {
+        applyToSslSettings { builder ->
+          builder.enabled(true)
+          builder.context(getMongoSslContext(backendClientCert, caCert))
+        }
+      }
     }
     .uuidRepresentation(UuidRepresentation.STANDARD)
     .codecRegistry(appBsonCodecRegistry)

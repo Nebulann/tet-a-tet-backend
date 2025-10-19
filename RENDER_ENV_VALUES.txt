@@ -5,11 +5,13 @@
 # Ktor Server
 KTOR_PORT=8080
 
-# MongoDB Connection (пустые значения для локальной разработки)
-MONGO_HOST=localhost
+# MongoDB Connection для Atlas (замени на свои значения)
+MONGO_HOST=cluster0.telhf6q.mongodb.net
 MONGO_PORT=27017
 MONGO_RS=
 MONGO_DATABASE=kupidon
+MONGO_USERNAME=aofhfafafjnaf
+MONGO_PASSWORD=asdasdasdwdad
 MONGO_BACKEND_CLIENT_CERT=
 MONGO_CA_CERT=
 
