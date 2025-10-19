@@ -90,12 +90,12 @@ object Env {
   
   
   context(app: Application)
-  val mailEmail: String get() =
-    app.appConfig["mail.email"]
+  val mailEmail: String? get() =
+    app.appConfig.propertyOrNull("mail.email")?.getString()
   
   context(app: Application)
-  val mailPwd: String get() =
-    app.appConfig["mail.pwd"]
+  val mailPwd: String? get() =
+    app.appConfig.propertyOrNull("mail.pwd")?.getString()
 
 
   // Firebase / FCM

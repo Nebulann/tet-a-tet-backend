@@ -11,10 +11,17 @@ import java.nio.charset.StandardCharsets
 
 fun Application.configureEmailService() {
   
-  EmailService.config = EmailService.Config(
-    fromEmail = Env.mailEmail,
-    fromPwd = Env.mailPwd,
-  )
+  val email = Env.mailEmail
+  val pwd = Env.mailPwd
+  
+  if (email != null && pwd != null) {
+    EmailService.config = EmailService.Config(
+      fromEmail = email,
+      fromPwd = pwd,
+    )
+  } else {
+    log.warn("Email service not configured: MAIL_EMAIL or MAIL_PWD not set")
+  }
   
 }
 
