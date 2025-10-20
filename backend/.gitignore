@@ -1,0 +1,67 @@
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### Private config ###
+ktor.prod.env
+ktor.local.env
+/nginx-proxy/certs-prod/
+
+### Firebase private files ###
+*-firebase-adminsdk*.json
+*.env
+*.env.local
+*.env.production
+*.env.development
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### Database ###
+*.db
+*.sqlite
+
+### Logs ###
+*.log
+logs/
+
+### Temporary files ###
+*.tmp
+*.temp
+
+### Application specific ###
+application.yml
+application-local.yml
+
+### Docker ###
+.docker/
