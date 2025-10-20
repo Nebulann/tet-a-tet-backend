@@ -25,6 +25,7 @@ import java.util.UUID
 fun Application.configureJwtAuthentication() {
   authentication {
     register(MyJWTAuthenticationProvider())
+    register(MyOptionalJWTAuthenticationProvider())
   }
 }
 
@@ -109,5 +110,43 @@ val ErrEmptyToken = CodeMsg(
 )
 
 
+/**
+ * Опциональный провайдер JWT аутентификации
+ * Не требует наличия Authorization заголовка
+ */
+class MyOptionalJWTAuthenticationProvider : AuthenticationProvider(Config()) {
+  
+  class Config : AuthenticationProvider.Config("optional-jwt")
+  
+  override suspend fun onAuthenticate(context: AuthenticationContext) {
+    val call = context.call
+    val authHeader = call.request.headers["Authorization"]
+    
+    // Если заголовка нет - просто пропускаем без principal
+    if (authHeader == null) {
+      return
+    }
+    
+    if (!authHeader.startsWith("Bearer ")) {
+      return
+    }
+    
+    val accessToken = authHeader.substring("Bearer ".length)
+    if (accessToken.isEmpty()) {
+      return
+    }
+    
+    val decodedAccess =
+      try {
+        AccessToken(accessToken)
+      }
+      catch (ex: Exception) {
+        // При любой ошибке просто не устанавливаем principal
+        return
+      }
+    
+    context.principal(decodedAccess)
+  }
+}
 
 
