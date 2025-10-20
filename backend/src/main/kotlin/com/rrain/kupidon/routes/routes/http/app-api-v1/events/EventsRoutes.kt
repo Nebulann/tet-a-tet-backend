@@ -54,10 +54,9 @@ import java.util.UUID
 fun Application.addEventsRoutes() {
   
   routing {
-    // GET список событий (публичный эндпоинт с опциональной авторизацией)
-    authenticate("optional-jwt", optional = true) {
-      get(ApiV1Routes.events) {
-        val userUuid = authUserIdOrNull // Опциональная авторизация
+    // GET список событий (публичный эндпоинт без авторизации)
+    get(ApiV1Routes.events) {
+      val userUuid: UUID? = null // Публичный эндпоинт
         val queryParams = call.queryParams
         
         val page = queryParams["page"]?.toIntOrNull() ?: 0
@@ -116,7 +115,6 @@ fun Application.addEventsRoutes() {
             "hasNext" to ((page + 1) * limit < total)
           )
         ))
-      }
     }
     
     authenticate {
