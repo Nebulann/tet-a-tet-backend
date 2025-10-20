@@ -34,6 +34,7 @@ import com.rrain.kupidon.routes.routes.http.test.addImgTestRoutes
 import com.rrain.kupidon.routes.routes.http.test.addJsonSerializationTestRoutes
 import com.rrain.kupidon.routes.routes.http.test.addMongoTestRoutes
 import com.rrain.kupidon.routes.routes.http.test.addSendEmailTestRoutes
+import com.rrain.kupidon.routes.routes.http.test.addSeedDataRoutes
 import io.ktor.server.application.*
 
 
@@ -49,6 +50,7 @@ fun Application.configureHttpRouting() {
   addJsonSerializationTestRoutes() // TODO
   addMongoTestRoutes() // TODO
   addSendEmailTestRoutes() // TODO
+  addSeedDataRoutes() // TODO
   
   
   addPwaManifestRoute() // TODO
