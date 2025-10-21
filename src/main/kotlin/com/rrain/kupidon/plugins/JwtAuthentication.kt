@@ -33,6 +33,8 @@ fun Application.configureJwtAuthentication() {
 
 val RoutingContext.authUserId: UUID get() = call.principal<AccessToken>()!!.userId
 
+val RoutingContext.authUserIdOrNull: UUID? get() = call.principal<AccessToken>()?.userId
+
 
 
 class MyJWTAuthenticationProvider : AuthenticationProvider(Config()) {

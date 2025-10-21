@@ -5,15 +5,26 @@
 # Ktor Server
 KTOR_PORT=8080
 
-# MongoDB Connection для Atlas (замени на свои значения)
+# MongoDB Connection для Atlas
+# ВАЖНО: Замени значения на свои из MongoDB Atlas
+# 1. Зайди в MongoDB Atlas → Database → Connect → Connect your application
+# 2. Скопируй connection string вида: mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/
+# 3. Извлеки из него host (без mongodb+srv://), username и password
+
 MONGO_HOST=cluster0.telhf6q.mongodb.net
 MONGO_PORT=27017
 MONGO_RS=
 MONGO_DATABASE=kupidon
-MONGO_USERNAME=aofhfafafjnaf
-MONGO_PASSWORD=asdasdasdwdad
+MONGO_USERNAME=your_mongodb_username
+MONGO_PASSWORD=your_mongodb_password
 MONGO_BACKEND_CLIENT_CERT=
 MONGO_CA_CERT=
+
+# ПРОВЕРКА MongoDB Atlas:
+# 1. Кластер должен быть активен (не в режиме паузы)
+# 2. Network Access: добавь 0.0.0.0/0 (Allow access from anywhere) или IP Render
+# 3. Database Access: проверь username и password
+# 4. Используй mongodb+srv:// для Atlas (код автоматически определит)
 
 # Password Hashing (временные значения для тестирования)
 PWD_HASHING_ALGORITHM=PBKDF2WithHmacSHA256

@@ -15,6 +15,7 @@ import com.rrain.kupidon.models.db.UserDataType
 import com.rrain.kupidon.models.db.UserM
 import com.rrain.kupidon.plugins.JacksonObjectMapper
 import com.rrain.kupidon.plugins.authUserId
+import com.rrain.kupidon.plugins.authUserIdOrNull
 import com.rrain.kupidon.routes.`response-errors`.respondInvalidBody
 import com.rrain.kupidon.routes.`response-errors`.respondNotFound
 import com.rrain.kupidon.routes.routes.http.`app-api-v1`.ApiV1Routes
@@ -53,69 +54,70 @@ import java.util.UUID
 fun Application.addEventsRoutes() {
   
   routing {
-    authenticate {
-      // GET список событий
-      get(ApiV1Routes.events) {
-        val userUuid = authUserId
-        val queryParams = call.queryParams
-        
-        val page = queryParams["page"]?.toIntOrNull() ?: 0
-        val limit = (queryParams["limit"]?.toIntOrNull() ?: 20).coerceIn(1, 100)
-        val category = queryParams["category"]?.let { 
-          try { EventCategory.valueOf(it) } catch (e: Exception) { null }
-        }
-        val search = queryParams["search"]?.takeIf { it.isNotBlank() }
-        val upcoming = queryParams["upcoming"]?.toBooleanStrictOrNull() ?: true
-        
-        val filters = mutableListOf(
-          Filters.eq(EventM::isActive.name, true)
-        )
-        
-        if (category != null) {
-          filters.add(Filters.eq(EventM::category.name, category))
-        }
-        
-        if (search != null) {
-          filters.add(
-            Filters.or(
-              Filters.regex(EventM::title.name, search, "i"),
-              Filters.regex(EventM::description.name, search, "i"),
-              Filters.`in`(EventM::tags.name, search)
-            )
-          )
-        }
-        
-        if (upcoming) {
-          filters.add(Filters.gte(EventM::startDate.name, now()))
-        }
-        
-        val totalFilter = if (filters.size == 1) filters[0] else Filters.and(filters)
-        
-        val total = collEvents.countDocuments(totalFilter)
-        val events = collEvents
-          .find(totalFilter)
-          .sort(
-            if (upcoming) Sorts.ascending(EventM::startDate.name)
-            else Sorts.descending(EventM::createdAt.name)
-          )
-          .skip(page * limit)
-          .limit(limit)
-          .toList()
-        
-        val eventsApi = events.map { event ->
-          event.toApi(call.host, call.port, userUuid)
-        }
-        
-        call.respond(mapOf(
-          "events" to eventsApi,
-          "pagination" to mapOf(
-            "page" to page,
-            "limit" to limit,
-            "total" to total,
-            "hasNext" to ((page + 1) * limit < total)
-          )
-        ))
+    // GET список событий (без авторизации, опциональная для персонализации)
+    get(ApiV1Routes.events) {
+      val userUuid = authUserIdOrNull
+      val queryParams = call.queryParams
+      
+      val page = queryParams["page"]?.toIntOrNull() ?: 0
+      val limit = (queryParams["limit"]?.toIntOrNull() ?: 20).coerceIn(1, 100)
+      val category = queryParams["category"]?.let { 
+        try { EventCategory.valueOf(it) } catch (e: Exception) { null }
       }
+      val search = queryParams["search"]?.takeIf { it.isNotBlank() }
+      val upcoming = queryParams["upcoming"]?.toBooleanStrictOrNull() ?: true
+      
+      val filters = mutableListOf(
+        Filters.eq(EventM::isActive.name, true)
+      )
+      
+      if (category != null) {
+        filters.add(Filters.eq(EventM::category.name, category))
+      }
+      
+      if (search != null) {
+        filters.add(
+          Filters.or(
+            Filters.regex(EventM::title.name, search, "i"),
+            Filters.regex(EventM::description.name, search, "i"),
+            Filters.`in`(EventM::tags.name, search)
+          )
+        )
+      }
+      
+      if (upcoming) {
+        filters.add(Filters.gte(EventM::startDate.name, now()))
+      }
+      
+      val totalFilter = if (filters.size == 1) filters[0] else Filters.and(filters)
+      
+      val total = collEvents.countDocuments(totalFilter)
+      val events = collEvents
+        .find(totalFilter)
+        .sort(
+          if (upcoming) Sorts.ascending(EventM::startDate.name)
+          else Sorts.descending(EventM::createdAt.name)
+        )
+        .skip(page * limit)
+        .limit(limit)
+        .toList()
+      
+      val eventsApi = events.map { event ->
+        event.toApi(call.host, call.port, userUuid)
+      }
+      
+      call.respond(mapOf(
+        "events" to eventsApi,
+        "pagination" to mapOf(
+          "page" to page,
+          "limit" to limit,
+          "total" to total,
+          "hasNext" to ((page + 1) * limit < total)
+        )
+      ))
+    }
+    
+    authenticate {
       
       // POST создать событие
       post(ApiV1Routes.events) {
